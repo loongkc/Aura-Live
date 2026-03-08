@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Aura Live</title>
+    <title>Aura Live · 移动适配</title>
     
+    <!-- PWA 配置 (需确保 manifest.json 和 sw.js 存在于同目录) -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13,10 +14,20 @@
     <link rel="apple-touch-icon" href="icon-192.png">
 
     <style>
+        /* 重置与安全区变量 */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         :root {
             --badge-bg: rgba(255, 255, 255, 0.5);
             --text-color: #1a1a1a;
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-right: env(safe-area-inset-right, 0px);
+            --safe-left: env(safe-area-inset-left, 0px);
         }
+
         body {
             margin: 0;
             background-color: #000;
@@ -24,10 +35,12 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
             overflow: hidden;
             -webkit-user-select: none;
             user-select: none;
+            /* 防止页面滚动 */
+            touch-action: pan-y pinch-zoom; 
         }
 
         .stage {
@@ -44,6 +57,7 @@
             display: inline-block;
             line-height: 0;
             box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+            /* 让内部绝对定位按钮参照 */
         }
 
         .media-content {
@@ -51,6 +65,8 @@
             max-height: 100vh;
             object-fit: contain;
             pointer-events: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         #videoLayer {
@@ -61,15 +77,18 @@
             opacity: 0;
             z-index: 2;
             transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none; /* 保证触摸穿透到下方的触摸层 */
         }
         
-        #photoLayer { z-index: 1; }
+        #photoLayer { 
+            z-index: 1; 
+        }
 
-        /* 精致白底半透明标志 */
+        /* --- 毛玻璃标识，适配安全区 --- */
         .live-badge {
             position: absolute;
-            top: 15px;
-            left: 15px;
+            top: calc(max(15px, var(--safe-top) + 8px));
+            left: calc(max(15px, var(--safe-left) + 8px));
             z-index: 10;
             display: flex;
             align-items: center;
@@ -80,8 +99,10 @@
             -webkit-backdrop-filter: blur(15px) saturate(160%);
             border-radius: 40px;
             border: 0.5px solid rgba(255, 255, 255, 0.2);
-            pointer-events: none;
+            pointer-events: none;  /* 不阻挡触摸层 */
             transition: all 0.3s ease;
+            /* 保证文字清晰 */
+            font-weight: 500;
         }
 
         .live-icon { width: 16px; height: 16px; }
@@ -93,11 +114,19 @@
         }
         .circle-inner { fill: var(--text-color); }
 
-        /* 播放动画状态 */
-        .is-playing .live-badge { background: rgba(255, 255, 255, 0.8); transform: scale(1.05); }
-        .is-playing .circle-outer { animation: rotate-live 1.2s linear infinite; stroke-dasharray: 4 2; }
+        .is-playing .live-badge { 
+            background: rgba(255, 255, 255, 0.8); 
+            transform: scale(1.05); 
+        }
+        .is-playing .circle-outer { 
+            animation: rotate-live 1.2s linear infinite; 
+            stroke-dasharray: 4 2; 
+        }
 
-        @keyframes rotate-live { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes rotate-live { 
+            from { transform: rotate(0deg); } 
+            to { transform: rotate(360deg); } 
+        }
 
         .live-text {
             color: var(--text-color);
@@ -107,14 +136,49 @@
             text-transform: uppercase;
         }
 
+        /* --- 新增：重新选择按钮 (同样毛玻璃，可点击) --- */
+        .rechoose-btn {
+            position: absolute;
+            top: calc(max(15px, var(--safe-top) + 8px));
+            right: calc(max(15px, var(--safe-right) + 8px));
+            z-index: 30; /* 高于触摸层，但触摸层范围是整个盒子，按钮需可点 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(15px) saturate(160%);
+            -webkit-backdrop-filter: blur(15px) saturate(160%);
+            border-radius: 40px;
+            border: 0.5px solid rgba(255, 255, 255, 0.2);
+            color: #1a1a1a;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            pointer-events: auto;  /* 允许点击 */
+            cursor: pointer;
+            transition: background 0.2s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            -webkit-touch-callout: none;
+        }
+
+        .rechoose-btn:active {
+            background: rgba(255, 255, 255, 0.8);
+            transform: scale(0.96);
+        }
+
+        /* 触摸层覆盖全盒，但按钮在上方需要穿透？触摸层是20，按钮设30可以响应 */
         #touchSurface {
             position: absolute;
             inset: 0;
             z-index: 20;
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
+            /* 保证触摸区域覆盖，但不遮挡按钮的点击 */
         }
 
+        /* 初始覆盖层 — 更适应移动端点击 */
         #initOverlay {
             position: fixed;
             inset: 0;
@@ -124,31 +188,68 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            gap: 20px;
+            gap: 24px;
+            padding: 20px;
         }
+
         .upload-trigger {
-            padding: 16px 40px;
+            padding: 18px 48px;
             background: #fff;
             color: #000;
-            border-radius: 50px;
+            border-radius: 60px;
             font-weight: 600;
+            font-size: 18px;
             cursor: pointer;
+            box-shadow: 0 8px 20px rgba(255,255,255,0.1);
+            transition: all 0.2s;
+            border: 1px solid rgba(255,255,255,0.3);
+            text-align: center;
+            min-width: 220px;
+            -webkit-touch-callout: none;
         }
-        .app-name { color: #fff; font-size: 24px; font-weight: 300; letter-spacing: 2px; }
+
+        .upload-trigger:active {
+            background: #f0f0f0;
+            transform: scale(0.97);
+        }
+
+        .app-name { 
+            color: #fff; 
+            font-size: 32px; 
+            font-weight: 300; 
+            letter-spacing: 4px;
+            text-shadow: 0 2px 10px rgba(255,255,255,0.2);
+        }
+
+        /* 提示小字 (可选) */
+        .hint {
+            color: rgba(255,255,255,0.5);
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        /* 工具类隐藏 */
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
 
+<!-- 初始启动层 (仅首次选择前显示) -->
 <div id="initOverlay">
     <div class="app-name">AURA LIVE</div>
     <label class="upload-trigger">
-        选择照片
+        选择实况照片
         <input type="file" id="fileIn" accept="image/*" style="display:none">
     </label>
+    <div class="hint">长按画面播放 Live</div>
 </div>
 
+<!-- 主播放舞台 (初始隐藏) -->
 <div class="stage">
     <div class="media-box" id="mediaBox" style="display:none">
+        <!-- Live 标识 (左上) -->
         <div class="live-badge" id="liveBadge">
             <svg class="live-icon" viewBox="0 0 24 24">
                 <circle class="circle-outer" cx="12" cy="12" r="9" fill="none"></circle>
@@ -156,91 +257,271 @@
             </svg>
             <span class="live-text">Live</span>
         </div>
-        <img id="photoLayer" class="media-content">
-        <video id="videoLayer" class="media-content" playsinline></video>
+
+        <!-- 重新选择按钮 (右上) 点击触发文件选择，不经过初始层 -->
+        <div class="rechoose-btn" id="rechooseBtn" role="button" aria-label="重新选择照片">
+            <span>↻</span> 更换
+        </div>
+
+        <!-- 静态图 & 视频层 -->
+        <img id="photoLayer" class="media-content" alt="Live photo static">
+        <video id="videoLayer" class="media-content" playsinline muted loop></video> <!-- muted初始防策略，实际播放时取消静音 -->
+        
+        <!-- 全手势触摸层 -->
         <div id="touchSurface"></div>
     </div>
 </div>
 
 <script>
-    // PWA Service Worker 注册
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js');
-        });
-    }
+    (function() {
+        "use strict";
 
-    const $ = id => document.getElementById(id);
-    let isPressing = false;
-    let longPressTimer = null;
+        // 工具函数
+        const $ = id => document.getElementById(id);
+        
+        // 获取元素
+        const initOverlay = $('initOverlay');
+        const mediaBox = $('mediaBox');
+        const fileInput = $('fileIn');
+        const photoLayer = $('photoLayer');
+        const videoLayer = $('videoLayer');
+        const touchSurface = $('touchSurface');
+        const liveBadge = $('liveBadge');
+        const rechooseBtn = $('rechooseBtn');
 
-    $('fileIn').onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        // 状态变量
+        let isPressing = false;          // 是否正在触摸
+        let longPressTimer = null;       // 长按定时器
+        let currentPhotoUrl = null;      // 用于释放objectURL
+        let currentVideoUrl = null;
 
-        const buffer = await file.arrayBuffer();
-        const view = new Uint8Array(buffer);
-        let videoBlob = null;
-
-        for (let i = view.length - 4; i >= 4; i--) {
-            if (view[i]===0x66 && view[i+1]===0x74 && view[i+2]===0x79 && view[i+3]===0x70) {
-                videoBlob = new Blob([buffer.slice(i - 4)], { type: 'video/mp4' });
-                break;
+        // --- 释放旧资源 ---
+        function revokeOldUrls() {
+            if (currentPhotoUrl) {
+                URL.revokeObjectURL(currentPhotoUrl);
+                currentPhotoUrl = null;
+            }
+            if (currentVideoUrl) {
+                URL.revokeObjectURL(currentVideoUrl);
+                currentVideoUrl = null;
             }
         }
 
-        if (videoBlob) {
-            $('photoLayer').src = URL.createObjectURL(file);
-            $('videoLayer').src = URL.createObjectURL(videoBlob);
-            $('initOverlay').style.display = 'none';
-            $('mediaBox').style.display = 'block';
-            bindEvents();
-        } else {
-            alert("非有效实况照片格式");
-        }
-    };
-
-    function bindEvents() {
-        const video = $('videoLayer');
-        const box = $('mediaBox');
-
-        const playLive = () => {
-            box.classList.add('is-playing');
-            video.style.opacity = '1';
-            video.muted = false;
-            video.currentTime = 0;
-            video.play();
-        };
-
-        const stopLive = () => {
-            box.classList.remove('is-playing');
-            video.style.opacity = '0';
-            setTimeout(() => { if(!isPressing) video.pause(); }, 250);
-        };
-
-        $('touchSurface').onpointerdown = (e) => {
-            isPressing = true;
-            longPressTimer = setTimeout(playLive, 200);
-        };
-
-        const end = () => {
+        // --- 停止任何播放中的视频，重置状态 ---
+        function resetVideoPlayback() {
+            // 清除长按定时器
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
             isPressing = false;
-            clearTimeout(longPressTimer);
-        };
+            
+            // 重置视频显示和播放
+            videoLayer.pause();
+            videoLayer.currentTime = 0;
+            videoLayer.style.opacity = '0';
+            mediaBox.classList.remove('is-playing');
+            // 取消静音恢复默认（下次播放时使用用户手势）
+            videoLayer.muted = true;  // 先静音，播放时再取消
+        }
 
-        $('touchSurface').onpointerup = end;
-        $('touchSurface').onpointerleave = end;
-        $('touchSurface').oncontextmenu = e => e.preventDefault();
+        // --- 处理新选择的文件 ---
+        async function handleFileSelection(file) {
+            if (!file) return;
 
-        video.onended = () => {
-            if (isPressing) {
-                video.currentTime = 0;
-                video.play();
+            try {
+                const buffer = await file.arrayBuffer();
+                const view = new Uint8Array(buffer);
+                let videoBlob = null;
+
+                // 简易实况照片检测：查找 'ftyp' box (mp4标识)
+                for (let i = view.length - 4; i >= 4; i--) {
+                    if (view[i] === 0x66 && view[i+1] === 0x74 && view[i+2] === 0x79 && view[i+3] === 0x70) {
+                        videoBlob = new Blob([buffer.slice(i - 4)], { type: 'video/mp4' });
+                        break;
+                    }
+                }
+
+                if (!videoBlob) {
+                    alert('不是有效的实况照片 (缺少视频轨道)');
+                    return;
+                }
+
+                // 先停止当前播放并释放旧URL
+                resetVideoPlayback();
+                revokeOldUrls();
+
+                // 创建新URL
+                const photoUrl = URL.createObjectURL(file);
+                const videoUrl = URL.createObjectURL(videoBlob);
+                currentPhotoUrl = photoUrl;
+                currentVideoUrl = videoUrl;
+
+                // 设置到元素
+                photoLayer.src = photoUrl;
+                videoLayer.src = videoUrl;
+
+                // 确保视频重置为静音、初始状态
+                videoLayer.muted = true;   // 避免自动播放策略，等用户手势时再取消静音
+                videoLayer.style.opacity = '0';
+                mediaBox.classList.remove('is-playing');
+
+                // 如果媒体盒隐藏则显示，并隐藏初始覆盖层
+                if (mediaBox.style.display === 'none') {
+                    mediaBox.style.display = 'block';
+                }
+                initOverlay.style.display = 'none';
+
+            } catch (err) {
+                console.error('文件处理出错', err);
+                alert('无法读取文件');
+            }
+        }
+
+        // --- 播放Live (由长按触发) ---
+        function playLive() {
+            // 检查视频是否已加载好
+            if (!videoLayer.src || videoLayer.readyState === 0) {
+                // 如果没有视频源，忽略
+                return;
+            }
+
+            // 取消静音，准备播放
+            videoLayer.muted = false;
+            videoLayer.currentTime = 0;
+            videoLayer.style.opacity = '1';
+            mediaBox.classList.add('is-playing');
+            
+            // 播放并捕获可能的错误 (比如用户再次点击但视频未加载)
+            videoLayer.play().catch(e => {
+                console.warn('播放失败:', e);
+                // 如果失败，恢复显示静态图
+                videoLayer.style.opacity = '0';
+                mediaBox.classList.remove('is-playing');
+                videoLayer.muted = true;
+            });
+        }
+
+        // --- 停止Live (手指抬起或离开) ---
+        function stopLive() {
+            // 如果正在播放中，淡出视频并暂停
+            if (mediaBox.classList.contains('is-playing')) {
+                mediaBox.classList.remove('is-playing');
+                videoLayer.style.opacity = '0';
+                // 延迟暂停以配合淡出动画
+                setTimeout(() => {
+                    if (!isPressing) {  // 确保不是重新按压
+                        videoLayer.pause();
+                        videoLayer.muted = true; // 恢复静音以便下次手势
+                    }
+                }, 250);
             } else {
+                // 如果没在播放，但可能因为其他原因暂停，确保静音
+                videoLayer.muted = true;
+            }
+        }
+
+        // --- 事件绑定 (只在首次加载时执行一次) ---
+
+        // 1. 文件选择 change 事件
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            await handleFileSelection(file);
+            // 清空 input 值，以便再次选择同一个文件也能触发 change
+            fileInput.value = '';
+        });
+
+        // 2. 重新选择按钮点击：触发隐藏 fileInput
+        rechooseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();  // 防止冒泡到触摸层
+            // 如果当前有播放，先重置
+            resetVideoPlayback();
+            fileInput.click();
+        });
+
+        // 3. 触摸层事件 (pointer 系列适合移动端)
+        touchSurface.addEventListener('pointerdown', (e) => {
+            e.preventDefault();  // 防止鼠标事件导致的选中或默认拖拽
+            // 如果视频源无效，忽略长按
+            if (!videoLayer.src) return;
+
+            isPressing = true;
+            longPressTimer = setTimeout(() => {
+                if (isPressing) {
+                    playLive();
+                }
+            }, 200); // 200ms 长按阈值
+        });
+
+        // 结束触摸的各种情况
+        function handlePointerEnd(e) {
+            // 如果是触摸结束，停止live
+            if (isPressing) {
+                isPressing = false;
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
                 stopLive();
             }
-        };
-    }
+        }
+
+        touchSurface.addEventListener('pointerup', handlePointerEnd);
+        touchSurface.addEventListener('pointercancel', handlePointerEnd);
+        touchSurface.addEventListener('pointerleave', handlePointerEnd); // 当手指滑出区域
+
+        // 禁止上下文菜单 (长按菜单)
+        touchSurface.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // 4. 视频结束事件：循环播放如果还在按压中，否则停止
+        videoLayer.addEventListener('ended', () => {
+            if (isPressing) {
+                // 用户还按着，重播
+                videoLayer.currentTime = 0;
+                videoLayer.play().catch(e => console.warn('重播失败', e));
+            } else {
+                // 手指已松开，确保回到静态图
+                stopLive();
+            }
+        });
+
+        // 5. 可选：如果视频加载出错，回退到静态图
+        videoLayer.addEventListener('error', (e) => {
+            console.warn('视频加载错误', e);
+            mediaBox.classList.remove('is-playing');
+            videoLayer.style.opacity = '0';
+            videoLayer.muted = true;
+        });
+
+        // 6. 页面卸载前释放资源 (好习惯)
+        window.addEventListener('beforeunload', () => {
+            revokeOldUrls();
+        });
+
+        // 7. 如果是通过PWA启动，且已有媒体，但啥也不做。额外处理：如果用户从初始层选择后，触摸事件一切正常。
+
+        // 8. 处理初始层仍然可见时，用户可能直接点击重新选择按钮？但初始层隐藏后按钮才可见，没问题。
+
+        // 9. 增加安全区适配：已经在样式中使用env()，无需额外JS。
+
+        // 10. 当重新选择时，保证视频停止并且URL释放已由handleFileSelection处理
+
+        // 额外：防止移动端双击缩放（虽然已在meta禁用）
+    })();
 </script>
+
+<!-- 注：需提供 manifest.json 和 sw.js 以实现完整 PWA 功能 -->
+<!-- manifest.json 示例:
+{
+  "name": "Aura Live",
+  "short_name": "Aura Live",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#000",
+  "theme_color": "#000",
+  "icons": [ ... ]
+}
+-->
+<!-- sw.js 可写入基础的缓存策略，此处略 -->
 </body>
 </html>
