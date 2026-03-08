@@ -10,16 +10,21 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Aura Live">
+    <link rel="apple-touch-icon" href="icon-192.png">
 
     <style>
         :root {
-            --badge-bg: rgba(255, 255, 255, 0.5);
+            /* 极致透明白底，保持清爽 */
+            --badge-bg: rgba(255, 255, 255, 0.45);
             --text-color: #1a1a1a;
-            --safe-top: env(safe-area-inset-top);
+            /* 适配移动端刘海屏安全区 */
+            --safe-top: env(safe-area-inset-top, 20px);
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
         }
 
         * {
             box-sizing: border-box;
+            /* 禁用系统原生手势干扰 */
             -webkit-touch-callout: none;
             -webkit-tap-highlight-color: transparent;
         }
@@ -37,7 +42,6 @@
             position: fixed; /* 防止橡皮筋回弹 */
         }
 
-        /* 外部容器 */
         .stage {
             position: relative;
             width: 100vw;
@@ -47,13 +51,12 @@
             align-items: center;
         }
 
-        /* 媒体包装器 */
         .media-box {
             position: relative;
             display: inline-block;
             line-height: 0;
-            transform: translateZ(0); /* 开启 GPU 加速 */
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            /* 开启硬件加速渲染 */
+            transform: translateZ(0);
         }
 
         .media-content {
@@ -70,49 +73,64 @@
             height: 100%;
             opacity: 0;
             z-index: 2;
-            transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            /* 极短的硬切换过渡 */
+            transition: opacity 0.15s cubic-bezier(0.25, 1, 0.5, 1);
         }
         
         #photoLayer { z-index: 1; }
 
-        /* --- 极致透明 Live 标志 --- */
+        /* --- 极致适配的 Live 标志 --- */
         .live-badge {
             position: absolute;
-            top: calc(15px + var(--safe-top));
-            left: 15px;
+            /* 考虑全屏手机安全区位置 */
+            top: calc(12px + var(--safe-top));
+            left: 12px;
             z-index: 10;
             display: flex;
             align-items: center;
             gap: 6px;
             padding: 5px 12px;
+            
+            /* 磨砂玻璃效果 */
             background: var(--badge-bg);
-            backdrop-filter: blur(15px) saturate(180%);
-            -webkit-backdrop-filter: blur(15px) saturate(180%);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            
             border-radius: 100px;
             border: 0.5px solid rgba(255, 255, 255, 0.2);
             pointer-events: none;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
-        .live-icon { width: 14px; height: 14px; }
+        .live-icon {
+            width: 14px;
+            height: 14px;
+        }
         .circle-outer {
             stroke: var(--text-color);
             stroke-width: 1.5;
             stroke-dasharray: 2 4;
             transform-origin: center;
         }
-        .circle-inner { fill: var(--text-color); }
-
-        .is-playing .live-badge { 
-            background: rgba(255, 255, 255, 0.8); 
-            transform: scale(1.05); 
-        }
-        .is-playing .circle-outer { 
-            animation: rotate-live 1.2s linear infinite; 
-            stroke-dasharray: 4 2; 
+        .circle-inner {
+            fill: var(--text-color);
         }
 
-        @keyframes rotate-live { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        /* 播放时的状态 */
+        .is-playing .live-badge {
+            background: rgba(255, 255, 255, 0.85); /* 播放时更清晰 */
+            transform: scale(1.03);
+        }
+        .is-playing .circle-outer {
+            animation: rotate-live 1s linear infinite;
+            stroke-dasharray: 4 2;
+        }
+
+        @keyframes rotate-live {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
 
         .live-text {
             color: var(--text-color);
@@ -122,15 +140,16 @@
             text-transform: uppercase;
         }
 
-        /* 透明交互层 */
+        /* 专门的交互层，遮住照片 */
         #touchSurface {
             position: absolute;
             inset: 0;
             z-index: 20;
-            touch-action: none;
+            touch-action: none; /* 禁用所有原生手势 */
+            cursor: pointer;
         }
 
-        /* 初始引导页 */
+        /* 初始引导界面 */
         #initOverlay {
             position: fixed;
             inset: 0;
@@ -140,20 +159,25 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            gap: 30px;
+            padding-bottom: var(--safe-bottom);
         }
+        
         .app-name {
             color: #fff;
-            font-size: 26px;
+            font-size: 28px;
             font-weight: 200;
-            letter-spacing: 6px;
+            letter-spacing: 5px;
+            margin-bottom: 30px;
         }
+
         .upload-trigger {
-            padding: 16px 45px;
+            padding: 18px 50px;
             background: #fff;
             color: #000;
             border-radius: 50px;
-            font-weight: 600;
+            font-weight: 700;
+            font-size: 16px;
+            box-shadow: 0 4px 15px rgba(255,255,255,0.1);
             cursor: pointer;
         }
     </style>
@@ -163,7 +187,7 @@
 <div id="initOverlay">
     <div class="app-name">AURA LIVE</div>
     <label class="upload-trigger">
-        打开照片
+        选择实况照片
         <input type="file" id="fileIn" accept="image/*" style="display:none">
     </label>
 </div>
@@ -177,14 +201,16 @@
             </svg>
             <span class="live-text">Live</span>
         </div>
+
         <img id="photoLayer" class="media-content">
-        <video id="videoLayer" class="media-content" playsinline preload="auto"></video>
+        <video id="videoLayer" class="media-content" playsinline preload="auto" webkit-playsinline></video>
+
         <div id="touchSurface"></div>
     </div>
 </div>
 
 <script>
-    // 注册 PWA Service Worker
+    // PWA Service Worker 注册
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
     }
@@ -197,76 +223,108 @@
         const file = e.target.files[0];
         if (!file) return;
 
+        // 重置状态
+        $('mediaBox').style.display = 'none';
+        $('initOverlay').style.display = 'flex';
+
+        // 提取二进制 MP4 流
         const buffer = await file.arrayBuffer();
         const view = new Uint8Array(buffer);
-        let videoBlobs = [];
+        let slices = [];
 
-        // 核心：深度扫描全文件。OPPO 等厂商在文件末尾才存放真正的高清有声视频
         for (let i = 0; i < view.length - 4; i++) {
-            // 搜索 MP4 标识 'ftyp'
             if (view[i]===0x66 && view[i+1]===0x74 && view[i+2]===0x79 && view[i+3]===0x70) {
-                // 向前偏移 4 字节是 MP4 容器起始点
-                videoBlobs.push(new Blob([buffer.slice(i - 4)], { type: 'video/mp4' }));
+                slices.push(i - 4); // 记录 MP4 头部起始点
             }
         }
 
-        if (videoBlobs.length > 0) {
-            // 取最后一段视频流（兼容 OPPO/一加 的主视频流策略）
-            const finalVideo = videoBlobs[videoBlobs.length - 1];
-            
-            $('photoLayer').src = URL.createObjectURL(file);
-            $('videoLayer').src = URL.createObjectURL(finalVideo);
-            $('initOverlay').style.display = 'none';
-            $('mediaBox').style.display = 'inline-block';
-            bindUI();
+        if (slices.length > 0) {
+            // 策略：提取每一个视频流，找到体积最大的那个（排除预览流）
+            let bestBlob = null;
+            let maxSize = 0;
+
+            slices.forEach((startPos, index) => {
+                const endPos = (index === slices.length - 1) ? view.length : slices[index + 1];
+                const currentSlice = buffer.slice(startPos, endPos);
+                
+                if (currentSlice.byteLength > maxSize) {
+                    maxSize = currentSlice.byteLength;
+                    bestBlob = new Blob([currentSlice], { type: 'video/mp4' });
+                }
+            });
+
+            // 只有检测到体积较大的主视频流才判定为实况照片
+            if (maxSize > 512000) { // 至少大于 500KB，避免错误的识别到过小的缩略流
+                $('photoLayer').src = URL.createObjectURL(file);
+                $('videoLayer').src = URL.createObjectURL(bestBlob);
+                $('initOverlay').style.display = 'none';
+                $('mediaBox').style.display = 'inline-block';
+                bindEvents();
+            } else {
+                alert("该照片不包含完整实况数据（数据量过小）。");
+            }
         } else {
-            alert("未识别到实况照片。请确认是原图上传。");
+            alert("该文件未包含有效的实况视频流。请确认上传的是原始文件。");
         }
     };
 
-    function bindUI() {
+    function bindEvents() {
         const video = $('videoLayer');
         const box = $('mediaBox');
 
-        const start = () => {
+        // 统一声音控制核心逻辑：交互即授权
+        const playLive = () => {
             box.classList.add('is-playing');
             video.style.opacity = '1';
-            video.muted = false; // 默认开启声音
+            
+            // 核心：强制开启声音
+            video.muted = false;
+            video.volume = 1.0;
             video.currentTime = 0;
-            video.play().catch(() => {
-                // 如果被浏览器策略阻断声音，则退回到静音播放
+            
+            video.play().catch(err => {
+                // 如果被浏览器安全策略拦截声音，则静音播放
+                console.warn("自动播放声音被拦截，退回到静音模式:", err);
                 video.muted = true;
                 video.play();
             });
         };
 
-        const stop = () => {
+        const stopLive = () => {
             box.classList.remove('is-playing');
             video.style.opacity = '0';
-            setTimeout(() => { if(!isPressing) video.pause(); }, 250);
+            // 略微延迟暂停，让淡出动画完成
+            setTimeout(() => { if(!isPressing) video.pause(); }, 200);
         };
 
+        // 移动端手势优化：pointer 事件
         $('touchSurface').onpointerdown = (e) => {
-            if (e.pointerType === 'mouse' && e.button !== 0) return;
             isPressing = true;
-            longPressTimer = setTimeout(start, 200);
+            // 移动端 250ms 判定为长按
+            longPressTimer = setTimeout(playLive, 250);
         };
 
-        const end = () => {
+        const endInteraction = (e) => {
             isPressing = false;
             clearTimeout(longPressTimer);
+            // 停止逻辑交由 video.onended 处理
         };
 
-        $('touchSurface').onpointerup = end;
-        $('touchSurface').onpointerleave = end;
+        $('touchSurface').onpointerup = endInteraction;
+        $('touchSurface').onpointerleave = endInteraction;
+        $('touchSurface').onpointercancel = endInteraction;
+        // 彻底禁用 contextmenu，确保长按不会弹出菜单
         $('touchSurface').oncontextmenu = e => e.preventDefault();
 
+        // 核心：播完后的逻辑决策
         video.onended = () => {
             if (isPressing) {
+                // 用户还按着，就循环
                 video.currentTime = 0;
                 video.play();
             } else {
-                stop();
+                // 用户松手了，播完单次停止
+                stopLive();
             }
         };
     }
