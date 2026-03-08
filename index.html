@@ -9,50 +9,59 @@
     <meta name="theme-color" content="#000000">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
+    <meta name="apple-mobile-web-app-title" content="Aura Live">
+
     <style>
         :root {
-            --badge-bg: rgba(255, 255, 255, 0.6);
-            --safe-top: env(safe-area-inset-top, 20px);
-            --safe-bottom: env(safe-area-inset-bottom, 20px);
+            --badge-bg: rgba(255, 255, 255, 0.55);
+            --text-color: #1a1a1a;
+            /* 适配 iOS 安全区变量 */
+            --safe-top: env(safe-area-inset-top);
+            --safe-bottom: env(safe-area-inset-bottom);
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-touch-callout: none; /* 禁用系统长按菜单 */
+            -webkit-tap-highlight-color: transparent; /* 禁用点击高亮 */
         }
 
         body {
             margin: 0;
             background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            /* 防止 iOS 橡皮筋回弹 */
+            position: fixed;
+            width: 100%;
+            overflow: hidden;
+            font-family: -apple-system, system-ui, sans-serif;
+        }
+
+        .stage {
+            position: relative;
+            width: 100vw;
             height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-family: -apple-system, system-ui, sans-serif;
-            /* 禁止系统橡皮筋回弹效果 */
-            overflow: hidden;
-            overscroll-behavior: none;
         }
 
-        /* 沉浸式布局容器 */
-        .app-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        /* 媒体包装器 */
         .media-box {
             position: relative;
             display: inline-block;
             line-height: 0;
-            /* 防止快速点击导致的系统缩放 */
-            touch-action: none; 
+            /* 硬件加速渲染 */
+            transform: translateZ(0);
         }
 
         .media-content {
             max-width: 100vw;
             max-height: 100vh;
             object-fit: contain;
+            pointer-events: none;
         }
 
         #videoLayer {
@@ -62,17 +71,18 @@
             height: 100%;
             opacity: 0;
             z-index: 2;
-            /* 丝滑过渡 */
-            transition: opacity 0.2s cubic-bezier(0.44, 0.33, 0, 1);
+            transition: opacity 0.2s cubic-bezier(0.25, 1, 0.5, 1);
         }
+        
+        #photoLayer { z-index: 1; }
 
-        /* 适配全面屏的 Live 标志位置 */
+        /* --- 移动端优化标志 --- */
         .live-badge {
             position: absolute;
-            /* 使用 safe-area 以免标志被灵动岛或状态栏挡住 */
-            top: calc(var(--safe-top) + 10px);
+            /* 考虑安全区距离 */
+            top: calc(15px + var(--safe-top));
             left: 15px;
-            z-index: 30;
+            z-index: 10;
             display: flex;
             align-items: center;
             gap: 6px;
@@ -81,122 +91,116 @@
             backdrop-filter: blur(20px) saturate(180%);
             -webkit-backdrop-filter: blur(20px) saturate(180%);
             border-radius: 100px;
+            border: 0.5px solid rgba(255, 255, 255, 0.3);
             pointer-events: none;
             transition: all 0.3s ease;
-            opacity: 0.9;
         }
 
+        .live-icon { width: 14px; height: 14px; }
         .circle-outer {
-            stroke: #000;
+            stroke: var(--text-color);
             stroke-width: 1.5;
             stroke-dasharray: 2 4;
             transform-origin: center;
         }
-        .circle-inner { fill: #000; }
+        .circle-inner { fill: var(--text-color); }
 
-        /* 激活态动效 */
-        .is-active .live-badge {
-            background: rgba(255, 255, 255, 0.95);
-            transform: scale(1.05);
+        .is-playing .live-badge { 
+            background: rgba(255, 255, 255, 0.85); 
+            transform: scale(1.05); 
         }
-        .is-active .circle-outer {
-            animation: live-rotate 1.5s linear infinite;
+        .is-playing .circle-outer { 
+            animation: rotate-live 1s linear infinite; 
+            stroke-dasharray: 4 2; 
         }
 
-        @keyframes live-rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
+        @keyframes rotate-live { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         .live-text {
-            color: #000;
+            color: var(--text-color);
             font-size: 12px;
-            font-weight: 600;
+            font-weight: 700;
             letter-spacing: 0.5px;
         }
 
-        /* 全屏交互面：避开边缘防止手势冲突 */
+        /* 专门的交互层，遮住整个照片 */
         #touchSurface {
             position: absolute;
-            top: 50px;
-            bottom: 50px;
-            left: 30px;
-            right: 30px;
-            z-index: 40;
-            /* 彻底禁用 iOS 长按弹出菜单 */
-            -webkit-touch-callout: none;
+            inset: 0;
+            z-index: 20;
+            touch-action: none; /* 禁用所有原生手势 */
         }
 
-        /* 启动视图 */
-        .init-view {
+        /* 引导页适配 */
+        #initOverlay {
             position: fixed;
             inset: 0;
-            z-index: 100;
             background: #000;
+            z-index: 100;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            gap: 30px;
+            padding-bottom: var(--safe-bottom);
         }
-
-        .upload-btn {
-            background: #fff;
-            color: #000;
-            padding: 16px 40px;
-            border-radius: 100px;
-            font-weight: 600;
-            font-size: 16px;
+        
+        .app-logo {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            margin-bottom: 20px;
             box-shadow: 0 10px 30px rgba(255,255,255,0.1);
         }
 
-        .logo-text {
-            font-size: 28px;
-            font-weight: 200;
-            letter-spacing: 6px;
-            color: #fff;
-            text-align: center;
+        .upload-trigger {
+            padding: 18px 45px;
+            background: #fff;
+            color: #000;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 16px;
+            box-shadow: 0 4px 20px rgba(255,255,255,0.2);
         }
     </style>
 </head>
 <body>
 
-<div id="initView" class="init-view">
-    <div class="logo-text">AURA LIVE</div>
-    <label class="upload-btn">
-        选取实况照片
-        <input type="file" id="fileInput" accept="image/*" style="display:none">
+<div id="initOverlay">
+    <img src="icon-512.png" class="app-logo" alt="Logo">
+    <label class="upload-trigger">
+        选择照片
+        <input type="file" id="fileIn" accept="image/*" style="display:none">
     </label>
 </div>
 
-<div class="app-container">
-    <div id="mediaBox" class="media-box" style="display:none">
-        <div class="live-badge">
-            <svg width="18" height="18" viewBox="0 0 24 24">
+<div class="stage">
+    <div class="media-box" id="mediaBox" style="display:none">
+        <div class="live-badge" id="liveBadge">
+            <svg class="live-icon" viewBox="0 0 24 24">
                 <circle class="circle-outer" cx="12" cy="12" r="9" fill="none"></circle>
                 <circle class="circle-inner" cx="12" cy="12" r="2.5"></circle>
             </svg>
             <span class="live-text">Live</span>
         </div>
-        
         <img id="photoLayer" class="media-content">
         <video id="videoLayer" class="media-content" playsinline preload="auto"></video>
-        
         <div id="touchSurface"></div>
     </div>
 </div>
 
 <script>
-    // 注册 SW
+    // PWA Service Worker 注册
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js');
+        });
     }
 
     const $ = id => document.getElementById(id);
-    let timer = null;
-    let isHolding = false;
+    let isPressing = false;
+    let longPressTimer = null;
 
-    $('fileInput').onchange = async (e) => {
+    $('fileIn').onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
@@ -204,7 +208,6 @@
         const view = new Uint8Array(buffer);
         let videoBlob = null;
 
-        // 高速扫描视频流
         for (let i = view.length - 4; i >= 4; i--) {
             if (view[i]===0x66 && view[i+1]===0x74 && view[i+2]===0x79 && view[i+3]===0x70) {
                 videoBlob = new Blob([buffer.slice(i - 4)], { type: 'video/mp4' });
@@ -215,62 +218,63 @@
         if (videoBlob) {
             $('photoLayer').src = URL.createObjectURL(file);
             $('videoLayer').src = URL.createObjectURL(videoBlob);
-            $('initView').style.display = 'none';
+            $('initOverlay').style.display = 'none';
             $('mediaBox').style.display = 'block';
-            setupInteraction();
+            bindEvents();
         } else {
-            alert("此照片不包含 Live 视频数据");
+            alert("此照片非原生实况格式或已被社交软件修改");
         }
     };
 
-    function setupInteraction() {
+    function bindEvents() {
         const video = $('videoLayer');
         const box = $('mediaBox');
 
-        const play = () => {
-            box.classList.add('is-active');
+        const playLive = () => {
+            box.classList.add('is-playing');
             video.style.opacity = '1';
             video.muted = false;
             video.currentTime = 0;
-            video.play();
-            // 触觉反馈 (仅 Android/部分移动端支持)
-            if (navigator.vibrate) navigator.vibrate(10);
-        };
-
-        const stop = () => {
-            box.classList.remove('is-active');
-            video.style.opacity = '0';
-            setTimeout(() => { if(!isHolding) video.pause(); }, 200);
-        };
-
-        // 移动端专用 Pointer 事件
-        $('touchSurface').addEventListener('pointerdown', (e) => {
-            isHolding = true;
-            timer = setTimeout(play, 150); // 略微缩短响应时间，增加灵敏度
-        });
-
-        const handleRelease = () => {
-            isHolding = false;
-            clearTimeout(timer);
-        };
-
-        $('touchSurface').addEventListener('pointerup', handleRelease);
-        $('touchSurface').addEventListener('pointerleave', handleRelease);
-        $('touchSurface').addEventListener('pointercancel', handleRelease);
-
-        video.onended = () => {
-            if (isHolding) {
-                video.currentTime = 0;
-                video.play();
-            } else {
-                stop();
+            // 移动端优化：确保声音加载完成
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(() => {
+                    video.muted = true;
+                    video.play();
+                });
             }
         };
 
-        // 强制禁用右键和弹出菜单
-        window.oncontextmenu = (e) => {
-            e.preventDefault();
-            return false;
+        const stopLive = () => {
+            box.classList.remove('is-playing');
+            video.style.opacity = '0';
+            // 略微延迟暂停，让淡出动画完成
+            setTimeout(() => { if(!isPressing) video.pause(); }, 200);
+        };
+
+        // 使用 pointer 事件统一处理触摸
+        $('touchSurface').onpointerdown = (e) => {
+            isPressing = true;
+            longPressTimer = setTimeout(playLive, 250);
+        };
+
+        const end = (e) => {
+            isPressing = false;
+            clearTimeout(longPressTimer);
+        };
+
+        $('touchSurface').onpointerup = end;
+        $('touchSurface').onpointercancel = end;
+        $('touchSurface').onpointerleave = end;
+
+        // 核心循环与单次播放逻辑
+        video.onended = () => {
+            if (isPressing) {
+                video.currentTime = 0;
+                video.play();
+            } else {
+                stopLive();
+            }
         };
     }
 </script>
